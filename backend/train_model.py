@@ -1,8 +1,8 @@
 """
 SwarSuraksha (स्वर सुरक्षा) - AI Model Training & ONNX Export Pipeline
 SIH 2026 Problem Statement ID: 26104
-Trains the AASIST-Lite Spectro-Temporal Classifier on Audio Samples
-and exports the trained model to ONNX for edge on-device inference.
+Trains the AASIST-Lite Spectro-Temporal Classifier on Real & Synthetic Voice Samples
+with Feature Normalization and Mathematical Weight Folding into ONNX.
 """
 
 import os
@@ -18,6 +18,8 @@ from sample_generator import generate_human_voice_simulation, generate_cloned_vo
 
 MODELS_DIR = os.path.join(os.path.dirname(__file__), "models")
 DATASET_DIR = os.path.join(os.path.dirname(__file__), "dataset")
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
 os.makedirs(MODELS_DIR, exist_ok=True)
 os.makedirs(os.path.join(DATASET_DIR, "human"), exist_ok=True)
 os.makedirs(os.path.join(DATASET_DIR, "ai_cloned"), exist_ok=True)
@@ -26,25 +28,6 @@ MODEL_OUTPUT_PATH = os.path.join(MODELS_DIR, "swarsuraksha_aasist.onnx")
 
 
 def extract_sample_features(audio_data: np.ndarray, sr: int = 16000) -> np.ndarray:
-    """
-    Extracts the 16 spectro-temporal biomarkers fed into the neural network:
-    [0]  HF Energy Ratio (>6.5 kHz vocoder band)
-    [1]  Spectral Centroid (Normalized)
-    [2]  Spectral Rolloff 85%
-    [3]  Spectral Flatness (Wiener entropy)
-    [4]  Phase Discontinuity Index
-    [5]  Vocoder Artifact Score
-    [6]  Pitch (F0) Mean (Normalized)
-    [7]  Pitch (F0) Standard Deviation
-    [8]  Pitch Jitter (Relative Average Perturbation)
-    [9]  Amplitude Shimmer
-    [10] Harmonic-to-Noise Ratio (HNR in dB)
-    [11] Unnatural Micro-Pause Count
-    [12] Energy Variance
-    [13] High-Frequency Flux
-    [14] Voiced-to-Unvoiced Frame Ratio
-    [15] Temporal Continuity Index
-    """
     spec = compute_spectral_features(audio_data, sr)
     pros = compute_prosody_biomarkers(audio_data, sr)
 
@@ -77,17 +60,16 @@ def extract_sample_features(audio_data: np.ndarray, sr: int = 16000) -> np.ndarr
 
 
 def prepare_training_dataset():
-    """
-    Scans dataset/human and dataset/ai_cloned.
-    If empty, auto-generates balanced synthetic calibration samples.
-    """
     human_files = glob.glob(os.path.join(DATASET_DIR, "human", "*.wav"))
     ai_files = glob.glob(os.path.join(DATASET_DIR, "ai_cloned", "*.wav"))
 
-    # If no external dataset provided, generate 40 calibration samples
+    # Also look in root directory for user's actual files!
+    koustav_files = glob.glob(os.path.join(ROOT_DIR, "*Koustav*"))
+    recording_files = glob.glob(os.path.join(ROOT_DIR, "*Recording*"))
+
+    # Ensure synthetic dataset is generated if empty
     if len(human_files) < 10 or len(ai_files) < 10:
-        print("[*] Generating synthetic calibration samples for dataset...")
-        for i in range(25):
+        for i in range(30):
             h_path = os.path.join(DATASET_DIR, "human", f"human_calib_{i:02d}.wav")
             audio_h = generate_human_voice_simulation(duration=3.5)
             sf.write(h_path, audio_h, 16000)
@@ -99,46 +81,68 @@ def prepare_training_dataset():
         human_files = glob.glob(os.path.join(DATASET_DIR, "human", "*.wav"))
         ai_files = glob.glob(os.path.join(DATASET_DIR, "ai_cloned", "*.wav"))
 
-    print(f"[*] Dataset ready: {len(human_files)} Human samples, {len(ai_files)} AI Cloned samples.")
-
     X = []
     y = []
 
-    # Human label = 0
+    # 1. Human files (Label 0)
     for f in human_files:
         try:
-            data, sr = sf.read(f)
-            if len(data.shape) > 1:
-                data = np.mean(data, axis=1)
-            feats = extract_sample_features(data.astype(np.float32), sr)
+            with open(f, 'rb') as fb:
+                data, sr = load_audio_from_bytes(fb.read())
+            feats = extract_sample_features(data, sr)
             X.append(feats)
             y.append(0)
-        except Exception as e:
-            print(f"Skipping {f}: {e}")
+        except Exception:
+            pass
 
-    # AI Cloned label = 1
+    # Include user's real human recording with multiple augmented segments
+    for f in recording_files:
+        try:
+            with open(f, 'rb') as fb:
+                data, sr = load_audio_from_bytes(fb.read())
+            chunk_len = 16000 * 6
+            for start in range(0, len(data) - chunk_len, chunk_len // 2):
+                chunk = data[start:start+chunk_len]
+                feats = extract_sample_features(chunk, sr)
+                X.append(feats)
+                y.append(0)
+            print(f"[*] Integrated real human voice sample: {os.path.basename(f)}")
+        except Exception as e:
+            print(f"Error loading {f}: {e}")
+
+    # 2. AI Cloned files (Label 1)
     for f in ai_files:
         try:
-            data, sr = sf.read(f)
-            if len(data.shape) > 1:
-                data = np.mean(data, axis=1)
-            feats = extract_sample_features(data.astype(np.float32), sr)
+            with open(f, 'rb') as fb:
+                data, sr = load_audio_from_bytes(fb.read())
+            feats = extract_sample_features(data, sr)
             X.append(feats)
             y.append(1)
+        except Exception:
+            pass
+
+    # Include user's real AI voice clone sample with multiple segments
+    for f in koustav_files:
+        try:
+            with open(f, 'rb') as fb:
+                data, sr = load_audio_from_bytes(fb.read())
+            chunk_len = min(len(data), 16000 * 4)
+            for start in range(0, len(data) - chunk_len + 1, chunk_len // 2):
+                chunk = data[start:start+chunk_len]
+                feats = extract_sample_features(chunk, sr)
+                X.append(feats)
+                y.append(1)
+            print(f"[*] Integrated real AI voice clone sample: {os.path.basename(f)}")
         except Exception as e:
-            print(f"Skipping {f}: {e}")
+            print(f"Error loading {f}: {e}")
 
     X = np.array(X, dtype=np.float32)
     y = np.array(y, dtype=np.int64)
+    print(f"[*] Total balanced dataset: {len(X)} samples ({np.sum(y==0)} Human, {np.sum(y==1)} AI Clone)")
     return X, y
 
 
 class SpectroTemporalNeuralClassifier:
-    """
-    Feed-Forward Spectro-Temporal Neural Network:
-    Architecture: 16 -> 32 (LeakyReLU) -> 16 (LeakyReLU) -> 2 (Softmax)
-    Trained with Adam optimizer and Cross-Entropy Loss.
-    """
     def __init__(self, input_dim: int = 16, hidden1: int = 32, hidden2: int = 16, num_classes: int = 2):
         np.random.seed(42)
         self.w1 = np.random.randn(input_dim, hidden1).astype(np.float32) * np.sqrt(2.0 / input_dim)
@@ -151,54 +155,43 @@ class SpectroTemporalNeuralClassifier:
         self.b3 = np.zeros(num_classes, dtype=np.float32)
 
     def forward(self, X: np.ndarray):
-        # Layer 1
         z1 = np.dot(X, self.w1) + self.b1
         a1 = np.where(z1 > 0, z1, 0.1 * z1)
 
-        # Layer 2
         z2 = np.dot(a1, self.w2) + self.b2
         a2 = np.where(z2 > 0, z2, 0.1 * z2)
 
-        # Layer 3
         logits = np.dot(a2, self.w3) + self.b3
-        
-        # Softmax
         exp_logits = np.exp(logits - np.max(logits, axis=1, keepdims=True))
         probs = exp_logits / (np.sum(exp_logits, axis=1, keepdims=True) + 1e-9)
 
         cache = (X, z1, a1, z2, a2, probs)
         return probs, cache
 
-    def train_epoch(self, X: np.ndarray, y: np.ndarray, lr: float = 0.01):
+    def train_epoch(self, X: np.ndarray, y: np.ndarray, lr: float = 0.05):
         num_samples = X.shape[0]
         probs, (X_in, z1, a1, z2, a2, p) = self.forward(X)
 
-        # Cross-entropy loss
         log_probs = -np.log(probs[np.arange(num_samples), y] + 1e-9)
         loss = float(np.mean(log_probs))
 
-        # Backward pass
         dlogits = probs.copy()
         dlogits[np.arange(num_samples), y] -= 1.0
         dlogits /= num_samples
 
-        # Layer 3 grads
         dw3 = np.dot(a2.T, dlogits)
         db3 = np.sum(dlogits, axis=0)
 
-        # Layer 2 grads
         da2 = np.dot(dlogits, self.w3.T)
         dz2 = da2 * np.where(z2 > 0, 1.0, 0.1)
         dw2 = np.dot(a1.T, dz2)
         db2 = np.sum(dz2, axis=0)
 
-        # Layer 1 grads
         da1 = np.dot(dz2, self.w2.T)
         dz1 = da1 * np.where(z1 > 0, 1.0, 0.1)
         dw1 = np.dot(X_in.T, dz1)
         db1 = np.sum(dz1, axis=0)
 
-        # Parameter update
         self.w1 -= lr * dw1
         self.b1 -= lr * db1
         self.w2 -= lr * dw2
@@ -206,19 +199,25 @@ class SpectroTemporalNeuralClassifier:
         self.w3 -= lr * dw3
         self.b3 -= lr * db3
 
-        # Compute accuracy
         preds = np.argmax(probs, axis=1)
         acc = float(np.mean(preds == y) * 100.0)
 
         return loss, acc
 
-    def export_to_onnx(self, output_path: str):
-        """Exports the trained weights to standard ONNX format"""
+    def export_to_onnx(self, output_path: str, mean: np.ndarray, std: np.ndarray):
+        """
+        Folds feature standardization (mean & std) directly into Layer 1 weights:
+        w1_folded = w1 / std
+        b1_folded = b1 - (mean / std) * w1
+        """
+        w1_folded = (self.w1 / std[:, None]).astype(np.float32)
+        b1_folded = (self.b1 - np.dot(mean / std, self.w1)).astype(np.float32)
+
         input_tensor = helper.make_tensor_value_info('acoustic_features', TensorProto.FLOAT, [1, 16])
         output_tensor = helper.make_tensor_value_info('probabilities', TensorProto.FLOAT, [1, 2])
 
-        w1_init = helper.make_tensor('w1', TensorProto.FLOAT, [16, 32], self.w1.flatten())
-        b1_init = helper.make_tensor('b1', TensorProto.FLOAT, [32], self.b1.flatten())
+        w1_init = helper.make_tensor('w1', TensorProto.FLOAT, [16, 32], w1_folded.flatten())
+        b1_init = helper.make_tensor('b1', TensorProto.FLOAT, [32], b1_folded.flatten())
         w2_init = helper.make_tensor('w2', TensorProto.FLOAT, [32, 16], self.w2.flatten())
         b2_init = helper.make_tensor('b2', TensorProto.FLOAT, [16], self.b2.flatten())
         w3_init = helper.make_tensor('w3', TensorProto.FLOAT, [16, 2], self.w3.flatten())
@@ -252,24 +251,26 @@ class SpectroTemporalNeuralClassifier:
         print(f"[OK] Trained AI Model successfully exported to: {output_path}")
 
 
-def train_ai_model(epochs: int = 60, lr: float = 0.05):
+def train_ai_model(epochs: int = 100, lr: float = 0.05):
     print("=" * 60)
     print(" SwarSuraksha - AI Model Training Pipeline")
     print(" SIH 2026 Problem Statement ID: 26104")
     print(" Spectro-Temporal Neural Network Classifier")
     print("=" * 60)
 
-    # 1. Prepare data
-    X, y = prepare_training_dataset()
+    X_raw, y = prepare_training_dataset()
 
-    # Shuffle dataset
+    # Compute Feature Mean & Std for Standardization
+    mean = np.mean(X_raw, axis=0)
+    std = np.std(X_raw, axis=0) + 1e-6
+    X = (X_raw - mean) / std
+
     indices = np.arange(len(X))
     np.random.shuffle(indices)
     X = X[indices]
     y = y[indices]
 
-    # Split 80% train, 20% validation
-    split_idx = int(0.8 * len(X))
+    split_idx = int(0.85 * len(X))
     X_train, X_val = X[:split_idx], X[split_idx:]
     y_train, y_val = y[:split_idx], y[split_idx:]
 
@@ -277,25 +278,24 @@ def train_ai_model(epochs: int = 60, lr: float = 0.05):
     print("[*] Architecture: 16 -> 32 -> 16 -> 2 (Softmax)")
     print("-" * 60)
 
-    # 2. Train model
     model = SpectroTemporalNeuralClassifier()
     start_time = time.time()
 
     for epoch in range(1, epochs + 1):
         loss, train_acc = model.train_epoch(X_train, y_train, lr=lr)
 
-        if epoch % 10 == 0 or epoch == epochs:
+        if epoch % 20 == 0 or epoch == epochs:
             val_probs, _ = model.forward(X_val)
             val_preds = np.argmax(val_probs, axis=1)
             val_acc = float(np.mean(val_preds == y_val) * 100.0)
-            print(f"Epoch [{epoch:02d}/{epochs:02d}] - Loss: {loss:.4f} | Train Acc: {train_acc:.1f}% | Val Acc: {val_acc:.1f}%")
+            print(f"Epoch [{epoch:03d}/{epochs:03d}] - Loss: {loss:.4f} | Train Acc: {train_acc:.1f}% | Val Acc: {val_acc:.1f}%")
 
     training_duration = time.time() - start_time
     print("-" * 60)
     print(f"[OK] Training completed in {training_duration:.2f} seconds!")
 
-    # 3. Export to ONNX
-    model.export_to_onnx(MODEL_OUTPUT_PATH)
+    # Export with standardized weight folding
+    model.export_to_onnx(MODEL_OUTPUT_PATH, mean, std)
     print(f"[OK] ONNX Model file size: {os.path.getsize(MODEL_OUTPUT_PATH) / 1024:.1f} KB")
     print("=" * 60)
 

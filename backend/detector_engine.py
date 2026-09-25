@@ -44,7 +44,7 @@ class CallStreamSession:
         pros_feats = compute_prosody_biomarkers(self.audio_buffer, sr)
 
         # 1. Neural ONNX Model Inference
-        raw_score = 0.10
+        raw_score = 0.08
         if self.onnx_session is not None and len(self.audio_buffer) >= 2048:
             try:
                 feats = extract_sample_features(self.audio_buffer, sr)
@@ -56,8 +56,7 @@ class CallStreamSession:
 
         # 2. Safety acoustic heuristic fusion
         vocoder_score = spec_feats["vocoder_artifact_score"]
-        prosody_score = pros_feats["prosody_anomaly_score"]
-        if vocoder_score > 0.60:
+        if vocoder_score > 0.50:
             raw_score = max(raw_score, vocoder_score * 0.90)
 
         # Exponential Moving Average smoothing
@@ -85,7 +84,7 @@ class CallStreamSession:
             "threat_level": threat_level,
             "status": status,
             "vocoder_score": round(vocoder_score * 100.0, 1),
-            "prosody_score": round(prosody_score * 100.0, 1),
+            "prosody_score": round(pros_feats["prosody_anomaly_score"] * 100.0, 1),
             "f0_mean_hz": pros_feats["mean_f0_hz"],
             "jitter_percent": pros_feats["jitter_local_percent"],
             "hf_energy_ratio": round(spec_feats["hf_energy_ratio"], 4)
@@ -108,7 +107,7 @@ class SwarSurakshaDetector:
         self.onnx_session = None
         self.load_onnx_model()
         self.model_info = {
-            "name": "SwarSuraksha AASIST-Lite Neural Model",
+            "name": "SwarSuraksha AASIST-Lite Neural Model v3.0",
             "framework": "ONNX Runtime 1.30 (Standard ONNX v14 / IR 9)",
             "model_path": MODEL_OUTPUT_PATH,
             "inference_mode": "Edge On-Device (Zero-Cloud Audio Leakage)",
@@ -146,25 +145,25 @@ class SwarSurakshaDetector:
         mean_f0 = pros_feats["mean_f0_hz"]
         f0_std = pros_feats["f0_std_hz"]
         hf_ratio = spec_feats["hf_energy_ratio"]
+        flatness = spec_feats["spectral_flatness"]
 
         # 1. Neural Model ONNX Inference
-        neural_prob_ai = 0.05
+        final_probability = 0.05
         if self.onnx_session is not None:
             try:
                 feats = extract_sample_features(y, sr)
                 input_name = self.onnx_session.get_inputs()[0].name
                 probs = self.onnx_session.run(None, {input_name: feats.reshape(1, 16)})[0]
-                neural_prob_ai = float(probs[0][1])
+                final_probability = float(probs[0][1])  # P(AI_Clone)
             except Exception as e:
                 print("ONNX inference fallback:", e)
 
-        # 2. Spectro-temporal acoustic calibration
-        # In forensic anti-spoofing, neural prediction is fused with physical acoustic boundaries
-        final_probability = neural_prob_ai
-        if vocoder_score > 0.60:
+        # 2. Forensic boundary fusion
+        if vocoder_score > 0.50:
             final_probability = max(final_probability, vocoder_score * 0.92)
-        if prosody_score > 0.60:
-            final_probability = max(final_probability, prosody_score * 0.88)
+        if flatness > 0.15:
+            # Neural synthesis produces elevated spectral flatness
+            final_probability = max(final_probability, 0.85)
 
         final_probability = float(np.clip(final_probability, 0.04, 0.98))
         risk_percent = round(final_probability * 100.0, 1)
@@ -173,6 +172,8 @@ class SwarSurakshaDetector:
         anomalies_detected = []
         if vocoder_score > 0.40:
             anomalies_detected.append("High-frequency neural vocoder phase artifacts detected (>6.5 kHz)")
+        if flatness > 0.15:
+            anomalies_detected.append(f"Elevated spectral flatness ({flatness:.3f}) typical of neural vocoders")
         if jitter_pct < 0.45:
             anomalies_detected.append("Robotic micro-pitch invariance (vocal fold jitter < 0.45% - typical of TTS synthesis)")
         elif jitter_pct > 3.6:
@@ -181,8 +182,6 @@ class SwarSurakshaDetector:
             anomalies_detected.append("Unnatural monotonic prosodic pitch cadence")
         if hf_ratio > 0.020:
             anomalies_detected.append("Anomalous high-frequency spectral rolloff ratio typical of HiFi-GAN/MelGAN")
-        if pros_feats["unnatural_pause_count"] > 1:
-            anomalies_detected.append(f"{pros_feats['unnatural_pause_count']} synthetic micro-concatenation pauses without glottal decay")
 
         if not anomalies_detected:
             anomalies_detected.append("Natural organic human vocal tract resonance and healthy micro-tremor")
