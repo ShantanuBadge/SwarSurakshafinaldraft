@@ -42,6 +42,7 @@ async def startup_event():
 
 
 @app.get("/api/status")
+@app.get("/api/health")
 def get_system_status():
     return {
         "status": "ONLINE",
