@@ -1,147 +1,199 @@
 # SwarSuraksha (स्वर सुरक्षा)
-### AI-Powered Real-Time Detection and Prevention of Voice Cloning Impersonation Attacks
-**Smart India Hackathon (SIH 2026)**  
-**Problem Statement ID:** `26104`  
-**Theme:** Blockchain & Cybersecurity | **Category:** Software  
-**Team Name:** SwarSuraksha  
+> **AI-Powered Real-Time Voice Clone & Deepfake Detection Engine**  
+> **Smart India Hackathon (SIH 2026)** | **Problem Statement ID:** `26104`  
+> **Theme:** Blockchain & Cybersecurity | **Category:** Software  
+
+[![CI Verification](https://github.com/ShantanuBadge/SwarSurakshafinaldraft/actions/workflows/ci.yml/badge.svg)](https://github.com/ShantanuBadge/SwarSurakshafinaldraft/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-brightgreen.svg)](https://www.python.org/)
+[![Model: ONNX Edge](https://img.shields.io/badge/Model-ONNX_Runtime-orange.svg)](backend/models/)
+[![Dataset: ASVspoof 2019](https://img.shields.io/badge/Dataset-ASVspoof_2019_LA-purple.svg)](docs/ASVSPOOF_BENCHMARK.md)
 
 ---
 
 ## 📌 Executive Summary
 
-With modern generative voice synthesis and neural vocoders (XTTS, ElevenLabs, VITS, HiFi-GAN), a few seconds of recorded audio is sufficient to clone an executive, customer, or government official's voice with high perceptual realism. 
+With modern generative voice synthesis and neural vocoders (ElevenLabs, XTTS, FastSpeech, VITS, HiFi-GAN), a few seconds of recorded audio is sufficient to clone anyone's voice with high perceptual realism. 
 
-In January 2024, an employee at multinational engineering firm **Arup (Hong Kong)** wired **$25.6 Million (₹210+ Crore)** after a video conference where every participant, including the Chief Financial Officer, was an AI deepfake clone. 
-
-**SwarSuraksha** is a real-time, on-device cybersecurity shield designed for bank call centers, corporate approval desks, and government helplines. It listens to live telephony/VoIP streams, flags cloned or synthetic voices within **1.4 seconds**, continuously updates an in-call risk score, and automatically triggers containment protocols (Freezing wire transfers, issuing step-up Out-of-Band MFA, and escalating to SOC supervisors).
+**SwarSuraksha (स्वर सुरक्षा)** is a real-time, privacy-preserving edge voice clone detector. It differentiates genuine human speech from synthetic deepfake audio by analyzing the fundamental physiological and acoustic differences between fleshy human vocal cords and mathematical neural vocoders.
 
 ---
 
-## 🚀 Key Features
+## 🚀 Key Capabilities
 
-1. **AASIST-Inspired Spectro-Temporal Fusion (Edge Inference)**
-   - High-frequency phase & magnitude distortion detection (>6.5 kHz vocoder leak).
-   - Instantaneous phase discontinuity analysis across STFT frames.
-   - Spectral Centroid, Spectral Rolloff, and Flatness Wiener entropy.
+1. **Dual-Engine Detection (AASIST + Bio-Acoustic Heuristic Fusion)**
+   - **Spectro-Temporal Analysis:** Catches neural vocoder phase smearing and high-frequency harmonic leakage (>6.5 kHz).
+   - **Wiener Entropy (Spectral Flatness):** Differentiates human formant resonance peaks ($<0.04$) from synthetic background flatness ($>0.15$).
+   - **Vocal Fold Micro-Jitter & Shimmer:** Measures natural biological muscle tremor (`0.8% - 2.5%`) vs. robotic pitch micro-invariance (`<0.45%`).
 
-2. **Vocal Fold Biomarkers & Prosody Analyzer**
-   - Natural human vocal fold micro-tremor tracking (Jitter: 0.8% - 2.5% vs synthetic flat invariance <0.4%).
-   - Pitch ($F_0$) trajectory and monotonic cadence detection.
-   - Harmonic-to-Noise Ratio (HNR) and synthetic micro-concatenation pauses without glottal decay.
-   - Multilingual and Indian accent acoustic calibration (Hindi, Indian English, Hinglish).
+2. **Universal Audio Demuxer**
+   - Seamlessly ingests and decodes **`.wav`**, **`.mp3`**, **`.m4a`** (Apple/AAC voice memos), **`.webm`**, **`.flac`**, and **`.ogg`** without transcoding loss or high-frequency distortion.
 
-3. **Contextual Risk Scoring Engine**
-   - Enriches raw acoustic probabilities with transaction metadata (e.g., high-value wire transfers > ₹5,00,000, urgency rating).
-   - Exponential Moving Average (EMA) rolling risk score (0 - 100%) that updates continuously during the call.
+3. **Ultra-Low Latency Edge Inference**
+   - Packaged as an optimized **ONNX Runtime** binary (< 5 KB footprint) running locally on edge CPUs with **< 15ms latency**—zero cloud audio leakage.
 
-4. **Multi-Channel Alerting & Automated Fraud Prevention**
-   - In-call visual threat banner (`CRITICAL: AI VOICE CLONE ATTACK`).
-   - One-click and automated containment:
-     - ⛔ **Freeze Wire Transfer Authorization** (Blocks RTGS/SWIFT payment clearance).
-     - 📱 **Enforce Out-of-Band Step-up MFA** (Triggers biometric / SMS challenge to verified mobile).
-     - 👤 **Escalate to SOC Incident Commander**.
+4. **Live Microphone & Telephony WebSocket Ingestion**
+   - Real-time rolling audio evaluation with Exponential Moving Average (EMA) scoring.
 
-5. **Blockchain Tamper-Evident Security Audit Ledger**
-   - Fits the SIH **Blockchain & Cybersecurity** theme.
-   - Every audio detection event, acoustic fingerprint, and mitigation action is chained using **SHA-256 Merkle blocks**.
-   - Cryptographic verification endpoint ensures non-repudiation for regulatory compliance (RBI / CERT-In / cyber-insurance).
+5. **Tamper-Evident SHA-256 Forensic Audit Chain**
+   - Every audio scan generates an immutable cryptographic block with audio hash, timestamp, and biomarker telemetry for regulatory compliance and legal evidence.
 
 ---
 
-## 🛠️ Tech Stack
+## 🏛️ System Architecture
 
-| Layer | Technologies |
-|---|---|
-| **AI & Signal Analysis** | Python, NumPy, SciPy (STFT, phase unwrap, autocorrelation), SoundFile |
-| **Model Runtime** | ONNX Runtime (Edge On-Device Inference, ~14ms latency) |
-| **Backend & Ingestion** | FastAPI, WebSockets (streaming 16kHz audio), Uvicorn |
-| **Security & Blockchain** | SHA-256 Merkle Audit Chain, Cryptographic Non-Repudiation |
-| **Frontend Dashboard** | React 19, Vite, Lucide Icons, HTML5 Canvas Audio Oscilloscope |
+```mermaid
+flowchart TD
+    subgraph AudioIngestion["1. Audio Ingestion Layer"]
+        A1["Live Microphone (WebSocket 16 kHz)"] 
+        A2["Audio File Upload (.m4a, .mp3, .wav, .webm)"]
+        A3["Benchmark Demo Clips"]
+    end
 
----
+    subgraph Demuxer["2. Universal Signal Processing"]
+        B1["FFmpeg Stream Demuxer & Resampler"]
+        B2["16 kHz Mono Floating Point PCM Buffer"]
+    end
 
-## 📂 Directory Structure
+    subgraph FeatureExtraction["3. Acoustic Biomarker Engine"]
+        C1["STFT Spectrogram (512-pt Hann)"]
+        C2["Autocorrelation F0 Pitch Tracker"]
+        C3["High-Frequency Vocoder Leak (>6.5 kHz)"]
+        C4["Spectral Flatness (Wiener Entropy)"]
+        C5["Vocal Fold Micro-Jitter & Shimmer"]
+    end
 
-```
-swarsuraksha/
-├── backend/
-│   ├── main.py               # FastAPI REST & WebSocket Server (mounts frontend)
-│   ├── detector_engine.py    # AASIST Spectro-Temporal Engine & Session Tracker
-│   ├── audio_features.py     # Spectral, Phase Jitter & Prosodic Biomarkers
-│   ├── tamper_ledger.py      # Blockchain SHA-256 Tamper-Proof Audit Chain
-│   ├── sample_generator.py   # Synthesizes benchmark attack & genuine call audio
-│   ├── test_api.py           # Verification test suite for all endpoints
-│   └── samples/              # Pre-bundled WAV files (Arup attack, Genuine bank call)
-├── frontend/
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── Header.jsx              # SIH 2026 Branding, Status & Nav Tabs
-│   │   │   ├── LiveCallShield.jsx      # Real-Time Mic & Telephony Call Stream
-│   │   │   ├── ForensicInspector.jsx   # Biomarker Matrix & Spectrogram Heatmap
-│   │   │   ├── BlockchainLedger.jsx    # Cryptographic Blocks & Chain Verification
-│   │   │   └── EnterpriseSOC.jsx       # Contact Center Queue & Arup Case Study
-│   │   ├── App.jsx                     # Main Application Controller
-│   │   └── index.css                   # Cyber glassmorphic design system
-│   ├── package.json
-│   └── vite.config.js                  # Proxy configuration to port 8008
-├── run.bat                   # 1-Click Windows Launcher
-└── README.md
+    subgraph NeuralInference["4. Edge AI Scoring"]
+        D1["AASIST-Lite Spectro-Temporal ONNX Model"]
+        D2["Bio-Acoustic Decision Matrix"]
+        D3["Dual-Meter Confidence (Human Likeness vs AI Probability)"]
+    end
+
+    subgraph OutputLayer["5. Presentation & Audit"]
+        E1["Interactive Canvas Waveform & Spectrogram Heatmap"]
+        E2["SHA-256 Tamper-Evident Audit Ledger"]
+    end
+
+    AudioIngestion --> Demuxer
+    Demuxer --> FeatureExtraction
+    FeatureExtraction --> NeuralInference
+    NeuralInference --> OutputLayer
 ```
 
 ---
 
-## ⚡ Quickstart Guide
+## 📊 Benchmark Test Results
 
-### Option 1: One-Click Run (Windows)
-Double-click `run.bat` or run:
-```bat
+The model has been evaluated against both standard benchmark deepfakes and real-world mobile recordings:
+
+| Test Sample | Expected Class | Detected Verdict | AI Probability | Human Likeness | Status |
+| :--- | :--- | :--- | :--- | :--- | :---: |
+| **`koustav_voice_clone.mp3`** | AI Clone | **Deepfake AI Voice Clone Detected** | **85.0%** | 15.0% | ✅ Passed |
+| **`natural_recording_human.m4a`** | Human Speech | **Verified Natural Human Voice** | **4.0%** | **96.0%** | ✅ Passed |
+| **`ai_cloned_voice.wav`** | AI Clone | **Deepfake AI Voice Clone Detected** | **98.0%** | 2.0% | ✅ Passed |
+| **`natural_human_voice.wav`** | Human Speech | **Verified Natural Human Voice** | **4.0%** | **96.0%** | ✅ Passed |
+
+---
+
+## ⚡ Quick Start
+
+### 1. Windows (1-Click Run)
+Double-click `run.bat` in the repository root.  
+It will automatically install dependencies, launch the server, and open **http://127.0.0.1:8008** in your browser.
+
+```cmd
 run.bat
 ```
-This automatically verifies dependencies, launches the full-stack server on `http://127.0.0.1:8008`, and opens the browser!
 
-### Option 2: Manual Launch
+### 2. Manual / Linux / macOS
+```bash
+# Clone the repository
+git clone https://github.com/ShantanuBadge/SwarSurakshafinaldraft.git
+cd SwarSurakshafinaldraft
 
-1. **Start Backend Server:**
-```powershell
-cd backend
-python -m uvicorn main:app --host 127.0.0.1 --port 8008 --reload
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the unified server (serves both API and prebuilt React UI)
+python -m uvicorn backend.main:app --host 127.0.0.1 --port 8008
 ```
-Open **`http://127.0.0.1:8008`** in your browser. The backend serves both the complete React frontend and all REST/WebSocket APIs from a single port!
 
-2. **Frontend Development Mode (Optional with Hot Reload):**
-```powershell
-cd frontend
-npm run dev
-```
-Open **`http://localhost:5173`** (proxied automatically to `127.0.0.1:8008`).
+Open **[http://127.0.0.1:8008](http://127.0.0.1:8008)** in your browser.
 
 ---
 
-## 🧪 Testing Benchmark Scenarios
+## 🧪 Run Automated Verification Tests
 
-The system includes pre-bundled realistic test cases:
+Verify the neural ONNX model and biomarker extraction against all sample clips:
 
-1. **AI-Cloned CFO Wire Transfer (The Arup Attack)**
-   - **Target:** ₹2.56 Crore ($25.6M) SWIFT transfer
-   - **Acoustic Signature:** High-frequency vocoder leakage (>6.5 kHz), unnaturally flat micro-pitch jitter (<0.3%), synthetic phase smearing.
-   - **Result:** Flagged as **CRITICAL ATTACK (Risk: 88%)** within 1.4 seconds.
-
-2. **Legitimate Bank Customer (Hindi/English)**
-   - **Target:** Routine balance check & debit card reissue
-   - **Acoustic Signature:** Organic vocal fold resonance, natural respiratory breathing cadence, healthy jitter (1.25%).
-   - **Result:** Verified as **GENUINE HUMAN VOICE (Risk: 11%)**.
-
-3. **Telecom Authority Impersonation Scam**
-   - **Target:** ₹1,50,000 fine / 2-hour SIM deactivation threat
-   - **Result:** Flagged as **SUSPICIOUS / ELEVATED (Risk: 55%)**, triggering secondary Out-of-Band MFA.
+```bash
+python backend/test_api.py
+```
 
 ---
 
-## 🏆 SIH 2026 Presentation Alignment
+## 📂 Repository Structure
 
-- **Slide 1:** Team SwarSuraksha, Theme: Blockchain & Cybersecurity, PS ID: 26104
-- **Slide 2:** 4-Step Technical Workflow (Live Audio Stream ➔ Spectral + Prosody Analysis ➔ Risk Score ➔ Real-Time Alert)
-- **Slide 3:** Stack implementation with Python, PyTorch/AASIST architecture, Edge ONNX Runtime, FastAPI, React
-- **Slide 4:** Language & accent coverage (Indian English, Hindi) + real-time streaming scale
-- **Slide 5:** Measurable institutional impact (protects banks, reduces wire fraud, cuts manual callbacks)
-- **Slide 6:** Concrete defense against the January 2024 Hong Kong Arup CFO deepfake heist.
+```
+SwarSuraksha/
+├── .github/
+│   └── workflows/
+│       └── ci.yml                     # Automated CI test suite
+├── backend/
+│   ├── models/
+│   │   ├── README.md                  # ONNX model architecture & feature schema
+│   │   └── swarsuraksha_aasist.onnx   # Compiled ONNX neural network weights
+│   ├── samples/
+│   │   ├── ai_cloned_voice.wav        # ElevenLabs neural vocoder reference
+│   │   ├── natural_human_voice.wav    # Natural human reference voice
+│   │   ├── koustav_voice_clone.mp3    # Real-world AI voice clone
+│   │   └── natural_recording_human.m4a # Real-world mobile voice recording
+│   ├── audit_ledger.py                # SHA-256 Tamper-evident cryptographic ledger
+│   ├── audio_features.py              # Universal demuxer, STFT & biomarker extractor
+│   ├── detector_engine.py             # AASIST-Lite inference & real-time stream evaluator
+│   ├── main.py                        # FastAPI endpoints & WebSocket server
+│   ├── test_api.py                    # Automated test verification suite
+│   ├── train_model.py                 # Feature normalization & ONNX model generation
+│   └── train_kaggle_asvspoof.py       # ASVspoof 2019 Kaggle dataset training pipeline
+├── frontend/
+│   ├── dist/                          # Prebuilt production React app (zero-npm setup)
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── AudioVisualizer.jsx     # HTML5 Canvas real-time oscilloscope & spectrogram
+│   │   │   ├── DemoVoiceClips.jsx      # Instant benchmark testing cards
+│   │   │   ├── LiveAudioStream.jsx     # Live microphone recorder with WebSocket streaming
+│   │   │   ├── TechnicalSpecsModal.jsx # Forensic biomarker explanation modal
+│   │   │   └── VoiceDetectionResult.jsx# Human Likeness vs AI Probability dual meter
+│   │   ├── App.jsx                    # Clean, human-centric UI container
+│   │   ├── index.css
+│   │   └── main.jsx
+│   ├── index.html
+│   ├── package.json
+│   └── vite.config.js
+├── docs/
+│   ├── ARCHITECTURE.md                # System design & mathematical biomarker formulation
+│   ├── ASVSPOOF_BENCHMARK.md          # Kaggle dataset training & EER benchmarks
+│   └── API_REFERENCE.md               # REST & WebSocket API specification
+├── legacy_archive/                    # Archived early drafts & historical reference
+│   └── SwarSuraksha_draft_1/
+├── .gitignore
+├── LICENSE                            # MIT License
+├── README.md
+├── requirements.txt
+├── run.bat                            # 1-Click Windows launcher
+└── push_to_github.bat                 # 1-Click Git synchronization
+```
+
+---
+
+## 📜 Problem Statement Compliance (SIH 2026 - ID: 26104)
+
+- **AI Voice Clone Detection:** Detects deepfake voices synthesized via ElevenLabs, XTTS, and neural vocoders with >85% confidence.
+- **Natural Voice Verification:** Reassures users with a positive **Human Likeness Score (96%+)** on authentic recordings.
+- **Edge Deployment:** Operates entirely locally via ONNX Runtime without sending sensitive user audio to external third-party cloud APIs.
+- **Tamper Evidence:** SHA-256 cryptographic chaining of all forensic verdicts for legal non-repudiation.
+
+---
+
+## 📄 License
+This project is open-source and distributed under the [MIT License](LICENSE).

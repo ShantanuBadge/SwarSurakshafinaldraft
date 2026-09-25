@@ -6,9 +6,11 @@ echo  Problem Statement ID: 26104
 echo ========================================================
 echo.
 
+cd /d "%~dp0"
+echo [1/2] Verifying Python Environment & Installing Dependencies...
+python -m pip install -q -r requirements.txt
+
 cd /d "%~dp0backend"
-echo [1/2] Verifying Python Environment...
-python -m pip install -q fastapi uvicorn numpy scipy soundfile onnxruntime python-multipart websockets
 
 echo [2/2] Launching SwarSuraksha Full-Stack Engine on http://127.0.0.1:8008 ...
 start "" "http://127.0.0.1:8008"

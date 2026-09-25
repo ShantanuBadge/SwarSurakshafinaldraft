@@ -1,0 +1,44 @@
+name: SwarSuraksha CI & Audio Verification
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-and-verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install System Audio Packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg libsndfile1
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify ONNX Model Integrity
+        run: |
+          python -c "import onnx; model = onnx.load('backend/models/swarsuraksha_aasist.onnx'); onnx.checker.check_model(model); print('ONNX Model Validated Successfully!')"
+
+      - name: Start FastAPI Test Server
+        run: |
+          cd backend
+          python -m uvicorn main:app --host 127.0.0.1 --port 8008 &
+          sleep 3
+
+      - name: Run Audio Detection Verification Suite
+        run: |
+          python backend/test_api.py

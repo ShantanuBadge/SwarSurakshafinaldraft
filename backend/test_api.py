@@ -36,10 +36,16 @@ print("=" * 60)
 print("TESTING SWARSURAKSHA AI DETECTION ON REAL USER FILES:")
 print("=" * 60)
 
-root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-test_file(os.path.join(root_dir, "Koustav Voice Clone.mp3.mpeg"), "Koustav AI Clone")
-test_file(os.path.join(root_dir, "Recording (5).m4a"), "Real Human Recording")
 backend_dir = os.path.dirname(__file__)
-test_file(os.path.join(backend_dir, "samples", "ai_cloned_voice.wav"), "Benchmark AI Clone")
-test_file(os.path.join(backend_dir, "samples", "natural_human_voice.wav"), "Benchmark Natural Human")
+samples_dir = os.path.join(backend_dir, "samples")
+root_dir = os.path.abspath(os.path.join(backend_dir, ".."))
+
+# Test real-world samples from backend/samples
+koustav_path = os.path.join(samples_dir, "koustav_voice_clone.mp3") if os.path.exists(os.path.join(samples_dir, "koustav_voice_clone.mp3")) else os.path.join(root_dir, "Koustav Voice Clone.mp3.mpeg")
+m4a_path = os.path.join(samples_dir, "natural_recording_human.m4a") if os.path.exists(os.path.join(samples_dir, "natural_recording_human.m4a")) else os.path.join(root_dir, "Recording (5).m4a")
+
+test_file(koustav_path, "Real Voice Clone (Koustav)")
+test_file(m4a_path, "Natural Human Voice (Recording 5)")
+test_file(os.path.join(samples_dir, "ai_cloned_voice.wav"), "Benchmark AI Clone (ElevenLabs)")
+test_file(os.path.join(samples_dir, "natural_human_voice.wav"), "Benchmark Natural Human")
 print("=" * 60)
