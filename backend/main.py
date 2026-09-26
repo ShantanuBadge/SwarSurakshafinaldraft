@@ -183,10 +183,31 @@ async def websocket_live_call_endpoint(websocket: WebSocket):
             pass
 
 
-# Mount built production React frontend if available
 FRONTEND_DIST = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "dist"))
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def get_favicon():
+    favicon_path = os.path.join(FRONTEND_DIST, "favicon.svg")
+    if os.path.exists(favicon_path):
+        return FileResponse(favicon_path, media_type="image/svg+xml")
+    return Response(status_code=204)
+
 if os.path.exists(FRONTEND_DIST):
     app.mount("/", StaticFiles(directory=FRONTEND_DIST, html=True), name="frontend")
+else:
+    @app.get("/")
+    def fallback_root():
+        return {
+            "status": "ONLINE",
+            "service": "SwarSuraksha Voice Clone Shield API",
+            "message": "AI Audio Engine initialized and ready.",
+            "endpoints": {
+                "health": "/api/health",
+                "status": "/api/status",
+                "analyze_file": "/api/analyze/file",
+                "live_websocket": "/ws/live-call"
+            }
+        }
 
 
 if __name__ == "__main__":
