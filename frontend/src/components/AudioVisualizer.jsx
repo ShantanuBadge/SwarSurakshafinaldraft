@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 
-export default function AudioVisualizer({ isActive, isAiVoice, audioDataArray }) {
+export default function AudioVisualizer({ isActive, isAiVoice, analyserNode }) {
   const canvasRef = useRef(null);
   const animationRef = useRef(null);
 
@@ -9,6 +9,7 @@ export default function AudioVisualizer({ isActive, isAiVoice, audioDataArray })
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     let phase = 0;
+    const timeBuffer = analyserNode ? new Uint8Array(analyserNode.fftSize) : null;
 
     const render = () => {
       animationRef.current = requestAnimationFrame(render);
@@ -20,26 +21,39 @@ export default function AudioVisualizer({ isActive, isAiVoice, audioDataArray })
 
       ctx.clearRect(0, 0, width, height);
 
+      // Measure live sound intensity if analyser is available
+      let liveGain = 1.0;
+      if (analyserNode && isActive) {
+        analyserNode.getByteTimeDomainData(timeBuffer);
+        let sumSq = 0;
+        for (let i = 0; i < timeBuffer.length; i++) {
+          const norm = (timeBuffer[i] - 128) / 128;
+          sumSq += norm * norm;
+        }
+        const rms = Math.sqrt(sumSq / timeBuffer.length);
+        liveGain = Math.min(3.2, 0.4 + rms * 14.0);
+      }
+
       // Draw 3 layered organic waves
       const waves = [
         {
           color: isAiVoice ? 'rgba(244, 63, 94, 0.45)' : 'rgba(99, 102, 241, 0.45)',
           freq: 0.025,
-          amp: isActive ? 24 : 6,
+          amp: isActive ? 22 * liveGain : 5,
           speed: 1.0,
           lineWidth: 2
         },
         {
           color: isAiVoice ? 'rgba(251, 113, 133, 0.7)' : 'rgba(56, 189, 248, 0.7)',
           freq: 0.038,
-          amp: isActive ? 18 : 4,
+          amp: isActive ? 16 * liveGain : 3,
           speed: -1.3,
           lineWidth: 2.5
         },
         {
           color: isAiVoice ? 'rgba(225, 29, 72, 0.95)' : 'rgba(16, 185, 129, 0.95)',
           freq: 0.05,
-          amp: isActive ? 12 : 2,
+          amp: isActive ? 11 * liveGain : 2,
           speed: 1.8,
           lineWidth: 3
         }
@@ -72,7 +86,7 @@ export default function AudioVisualizer({ isActive, isAiVoice, audioDataArray })
     return () => {
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
     };
-  }, [isActive, isAiVoice]);
+  }, [isActive, isAiVoice, analyserNode]);
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '110px', background: 'rgba(10, 14, 26, 0.65)', borderRadius: '16px', overflow: 'hidden', border: '1px solid var(--border-subtle)' }}>

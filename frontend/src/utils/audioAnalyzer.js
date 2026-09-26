@@ -181,22 +181,26 @@ export async function analyzeAudioClientSide(audioBlob, speakerName = "Uploaded 
     }
 
     // Forensic classification based on physical vocoder & human biology
-    // AI indicators: Flatness > 0.10, OR HF leakage > 0.025, OR micro-jitter < 0.45%
+    // AI indicators: Flatness > 0.065, OR HF leakage > 0.018, OR micro-jitter < 0.50%
     let isAi = false;
     let vocoderScore = 0.02;
 
-    if (avgFlatness > 0.10) {
+    if (avgFlatness > 0.065) {
       isAi = true;
-      vocoderScore = Math.min(0.95, 0.40 + (avgFlatness * 1.8));
+      vocoderScore = Math.min(0.96, 0.45 + (avgFlatness * 2.2));
     }
-    if (avgHfRatio > 0.025) {
+    if (avgHfRatio > 0.018) {
       isAi = true;
-      vocoderScore = Math.max(vocoderScore, Math.min(0.98, avgHfRatio * 9.5));
+      vocoderScore = Math.max(vocoderScore, Math.min(0.98, avgHfRatio * 18.0));
+    }
+    if (pitchPeriods.length >= 4 && jitterPct < 0.50) {
+      isAi = true;
+      vocoderScore = Math.max(vocoderScore, 0.82);
     }
 
     let riskScore = 4.0;
     if (isAi) {
-      riskScore = Math.min(98.0, Math.max(78.0, vocoderScore * 100.0));
+      riskScore = Math.min(98.0, Math.max(76.0, vocoderScore * 100.0));
     } else {
       // Natural human voice verified
       riskScore = 4.0;
@@ -211,14 +215,14 @@ export async function analyzeAudioClientSide(audioBlob, speakerName = "Uploaded 
 
     const anomalies = [];
     if (isAi) {
-      if (avgFlatness > 0.10) {
-        anomalies.push(`Elevated spectral flatness (${avgFlatness.toFixed(3)}) typical of neural vocoders`);
+      if (avgFlatness > 0.065) {
+        anomalies.push(`Elevated spectral flatness (${avgFlatness.toFixed(3)}) characteristic of neural vocoder noise`);
       }
-      if (avgHfRatio > 0.025) {
-        anomalies.push(`High-frequency vocoder phase smearing detected (>6.5 kHz, ratio: ${avgHfRatio.toFixed(4)})`);
+      if (avgHfRatio > 0.018) {
+        anomalies.push(`High-frequency vocoder phase smearing detected (>6.0 kHz, ratio: ${avgHfRatio.toFixed(4)})`);
       }
-      if (jitterPct < 0.45) {
-        anomalies.push("Robotic pitch micro-invariance (vocal fold jitter < 0.45%)");
+      if (jitterPct < 0.50) {
+        anomalies.push("Robotic pitch micro-invariance (vocal fold jitter < 0.50%)");
       }
     } else {
       anomalies.push("Natural organic vocal tract formant resonances verified");
