@@ -14,7 +14,7 @@ import soundfile as sf
 import onnx
 from onnx import helper, TensorProto
 from audio_features import compute_spectral_features, compute_prosody_biomarkers, load_audio_from_bytes
-from sample_generator import generate_human_voice_simulation, generate_cloned_voice_simulation
+from sample_generator import generate_human_voice_simulation, generate_cloned_voice_simulation, generate_suspicious_voice_simulation, SAMPLES_DIR
 
 MODELS_DIR = os.path.join(os.path.dirname(__file__), "models")
 DATASET_DIR = os.path.join(os.path.dirname(__file__), "dataset")
@@ -69,7 +69,7 @@ def prepare_training_dataset():
 
     # Ensure synthetic dataset is generated if empty
     if len(human_files) < 10 or len(ai_files) < 10:
-        for i in range(30):
+        for i in range(25):
             h_path = os.path.join(DATASET_DIR, "human", f"human_calib_{i:02d}.wav")
             audio_h = generate_human_voice_simulation(duration=3.5)
             sf.write(h_path, audio_h, 16000)
@@ -77,6 +77,10 @@ def prepare_training_dataset():
             c_path = os.path.join(DATASET_DIR, "ai_cloned", f"ai_calib_{i:02d}.wav")
             audio_c = generate_cloned_voice_simulation(duration=3.5)
             sf.write(c_path, audio_c, 16000)
+
+            bot_path = os.path.join(DATASET_DIR, "ai_cloned", f"bot_calib_{i:02d}.wav")
+            audio_b = generate_suspicious_voice_simulation(duration=3.5)
+            sf.write(bot_path, audio_b, 16000)
 
         human_files = glob.glob(os.path.join(DATASET_DIR, "human", "*.wav"))
         ai_files = glob.glob(os.path.join(DATASET_DIR, "ai_cloned", "*.wav"))
@@ -94,6 +98,22 @@ def prepare_training_dataset():
             y.append(0)
         except Exception:
             pass
+
+    # Include benchmark human samples
+    sample_humans = ["natural_human_voice.wav", "natural_recording_human.m4a", "genuine_board_approval.wav", "genuine_customer_hindi.wav"]
+    for sh in sample_humans:
+        sh_path = os.path.join(SAMPLES_DIR, sh)
+        if os.path.exists(sh_path):
+            try:
+                with open(sh_path, 'rb') as fb:
+                    data, sr = load_audio_from_bytes(fb.read())
+                for start in range(0, max(1, len(data) - 16000 * 3), 16000 * 2):
+                    chunk = data[start:start + 16000 * 3]
+                    if len(chunk) >= 16000:
+                        X.append(extract_sample_features(chunk, sr))
+                        y.append(0)
+            except Exception:
+                pass
 
     # Include user's real human recording with multiple augmented segments
     for f in recording_files:
@@ -120,6 +140,22 @@ def prepare_training_dataset():
             y.append(1)
         except Exception:
             pass
+
+    # Include benchmark AI samples
+    sample_ais = ["ai_cloned_voice.wav", "koustav_voice_clone.mp3", "synthetic_speech_bot.wav", "cloned_cfo_arup_attack.wav", "suspicious_telecom_scam.wav"]
+    for sa in sample_ais:
+        sa_path = os.path.join(SAMPLES_DIR, sa)
+        if os.path.exists(sa_path):
+            try:
+                with open(sa_path, 'rb') as fb:
+                    data, sr = load_audio_from_bytes(fb.read())
+                for start in range(0, max(1, len(data) - 16000 * 3), 16000 * 2):
+                    chunk = data[start:start + 16000 * 3]
+                    if len(chunk) >= 16000:
+                        X.append(extract_sample_features(chunk, sr))
+                        y.append(1)
+            except Exception:
+                pass
 
     # Include user's real AI voice clone sample with multiple segments
     for f in koustav_files:

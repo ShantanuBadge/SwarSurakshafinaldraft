@@ -160,33 +160,42 @@ export default function App() {
           return;
         }
 
-        // 2. Active Voice Detected: Compute Spectral Flatness (Wiener entropy)
+        // 2. Active Voice Detected: Compute Spectral Flatness in Speech Formant Band (250 - 4500 Hz)
+        const kSpeechMin = Math.max(1, Math.floor(250 / binWidth));
+        const kSpeechMax = Math.min(binCount - 1, Math.floor(4500 / binWidth));
+        const numSpeechBins = kSpeechMax - kSpeechMin + 1;
+
         let totalPower = 0;
         let hfPower = 0;
-        let sumLogPower = 0;
+        let speechTotalPower = 0;
+        let speechLogSum = 0;
         let weightedSum = 0;
 
         for (let k = 0; k < binCount; k++) {
           const p = Math.pow(10, freqData[k] / 10) + 1e-12;
           totalPower += p;
-          sumLogPower += Math.log(p);
           const freq = k * binWidth;
           weightedSum += freq * p;
+
+          if (k >= kSpeechMin && k <= kSpeechMax) {
+            speechTotalPower += p;
+            speechLogSum += Math.log(p);
+          }
 
           if (k >= bin6k) {
             hfPower += p;
           }
         }
 
-        const geoMean = Math.exp(sumLogPower / binCount);
-        const arithMean = totalPower / binCount;
-        const currentFlatness = Math.min(1.0, geoMean / (arithMean + 1e-12));
+        const speechGeo = Math.exp(speechLogSum / numSpeechBins);
+        const speechArith = speechTotalPower / numSpeechBins;
+        const currentSpeechFlatness = Math.min(1.0, speechGeo / (speechArith + 1e-12));
         const currentHfRatio = hfPower / (totalPower + 1e-12);
         const currentCentroid = weightedSum / (totalPower + 1e-12);
 
         // 3. Time-Domain Autocorrelation for Pitch (F0) & Micro-Jitter
-        const minLag = Math.floor(sampleRate / 450); // max 450 Hz
-        const maxLag = Math.floor(sampleRate / 75);  // min 75 Hz
+        const minLag = Math.floor(sampleRate / 400); // max 400 Hz
+        const maxLag = Math.floor(sampleRate / 70);  // min 70 Hz
         let bestLag = 0;
         let maxCorr = -1;
         let r0 = 0;
@@ -209,28 +218,28 @@ export default function App() {
         }
 
         const harmonicity = r0 > 0 ? (maxCorr / (r0 + 1e-8)) : 0;
-        const currentF0 = (bestLag > 0 && harmonicity > 0.35) ? (sampleRate / bestLag) : null;
+        const currentF0 = (bestLag > 0 && harmonicity > 0.45) ? (sampleRate / bestLag) : null;
 
-        // Store active frame in history (rolling window of 10 frames)
+        // Store active frame in history (rolling window of 8 speech frames)
         activeFramesHistoryRef.current.push({
-          flatness: currentFlatness,
+          speechFlatness: currentSpeechFlatness,
           hfRatio: currentHfRatio,
           centroid: currentCentroid,
           f0: currentF0,
           harmonicity
         });
-        if (activeFramesHistoryRef.current.length > 10) {
+        if (activeFramesHistoryRef.current.length > 8) {
           activeFramesHistoryRef.current.shift();
         }
 
         // Compute rolling averages across recent speech frames
         const frames = activeFramesHistoryRef.current;
-        const avgFlatness = frames.reduce((acc, f) => acc + f.flatness, 0) / frames.length;
+        const avgSpeechFlatness = frames.reduce((acc, f) => acc + f.speechFlatness, 0) / frames.length;
         const avgHfRatio = frames.reduce((acc, f) => acc + f.hfRatio, 0) / frames.length;
         const avgCentroid = frames.reduce((acc, f) => acc + f.centroid, 0) / frames.length;
 
         const validF0s = frames.map(f => f.f0).filter(f => f !== null);
-        let f0Mean = 145.0;
+        let f0Mean = 140.0;
         let f0Std = 22.0;
         let jitter = 1.35;
 
@@ -240,48 +249,76 @@ export default function App() {
           const variance = validF0s.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / validF0s.length;
           f0Std = parseFloat(Math.sqrt(variance).toFixed(1));
 
-          let periodDiffSum = 0;
+          // Filter out octave jumps (>45 Hz) for local micro-jitter
+          const diffs = [];
           for (let i = 0; i < validF0s.length - 1; i++) {
-            const p1 = 1 / validF0s[i];
-            const p2 = 1 / validF0s[i + 1];
-            periodDiffSum += Math.abs(p1 - p2);
+            const d = Math.abs(validF0s[i] - validF0s[i + 1]);
+            if (d < 45.0) diffs.push(d);
           }
-          const meanPeriod = 1 / mean;
-          jitter = parseFloat(((periodDiffSum / (validF0s.length - 1)) / meanPeriod * 100).toFixed(2));
+          if (diffs.length > 0) {
+            const meanDiff = diffs.reduce((a, b) => a + b, 0) / diffs.length;
+            jitter = parseFloat(((meanDiff / f0Mean) * 100.0).toFixed(2));
+          }
         }
 
-        // 4. Acoustic Decision Fusion (Wiener Flatness, HF Leakage, Jitter)
+        // 4. Acoustic Decision Fusion (Speech-Band Flatness, Vocoder Overtones, Prosody Monotonicity)
         let isAi = false;
         let vocoderArtifactScore = 0.03;
+        let prosodyAnomalyScore = 0.03;
         const anomalies = [];
 
-        // Check 1: Neural Vocoder Diffuse Spectral Flatness
-        if (avgFlatness > 0.065) {
+        // Check 1: Neural Vocoder Diffuse Flatness in speech formant band
+        if (avgSpeechFlatness > 0.040) {
           isAi = true;
-          vocoderArtifactScore = Math.max(vocoderArtifactScore, Math.min(0.96, 0.45 + avgFlatness * 2.2));
-          anomalies.push(`Elevated spectral flatness (${avgFlatness.toFixed(3)}) characteristic of neural vocoder noise`);
+          vocoderArtifactScore = Math.max(vocoderArtifactScore, Math.min(0.96, 0.45 + (avgSpeechFlatness - 0.040) * 3.5));
+          anomalies.push(`Elevated speech-band spectral flatness (${avgSpeechFlatness.toFixed(3)}) characteristic of neural vocoders`);
         }
 
-        // Check 2: High-Frequency Energy Leakage (>6 kHz)
-        if (avgHfRatio > 0.018) {
+        // Check 2: High-Frequency Energy Leakage (>6 kHz) or elevated centroid
+        if (avgHfRatio > 0.015) {
           isAi = true;
-          vocoderArtifactScore = Math.max(vocoderArtifactScore, Math.min(0.98, avgHfRatio * 18.0));
+          vocoderArtifactScore = Math.max(vocoderArtifactScore, Math.min(0.98, avgHfRatio * 16.0));
           anomalies.push(`High-frequency vocoder phase smear detected (>6.0 kHz band ratio: ${(avgHfRatio * 100).toFixed(2)}%)`);
+        } else if (avgCentroid > 1850) {
+          isAi = true;
+          vocoderArtifactScore = Math.max(vocoderArtifactScore, Math.min(0.92, (avgCentroid - 1850) / 1000.0 + 0.40));
+          anomalies.push(`Elevated spectral centroid (${avgCentroid.toFixed(0)} Hz) reflecting unnatural synthesis harmonics`);
         }
 
-        // Check 3: Robotic Micro-Pitch Monotonicity (if pitch frames available)
-        if (validF0s.length >= 4 && (jitter < 0.50 || f0Std < 6.0)) {
-          isAi = true;
-          anomalies.push(`Unnatural micro-pitch invariance (${jitter}% jitter, ±${f0Std} Hz variation)`);
+        // Check 3: Robotic Micro-Pitch Monotonicity & Invariance
+        if (validF0s.length >= 3) {
+          if (jitter < 0.55 && f0Std < 10.0) {
+            isAi = true;
+            prosodyAnomalyScore = Math.max(prosodyAnomalyScore, 0.88);
+            anomalies.push(`Robotic micro-pitch invariance (${jitter}% jitter, ±${f0Std} Hz variation typical of TTS synthesis)`);
+          } else if (jitter < 0.55) {
+            isAi = true;
+            prosodyAnomalyScore = Math.max(prosodyAnomalyScore, 0.78);
+            anomalies.push(`Artificially rigid micro-pitch tremor (jitter: ${jitter}%)`);
+          } else if (f0Std < 8.0) {
+            isAi = true;
+            prosodyAnomalyScore = Math.max(prosodyAnomalyScore, 0.80);
+            anomalies.push(`Unnatural monotonic pitch intonation contour (±${f0Std} Hz variation)`);
+          } else if (jitter > 3.8) {
+            isAi = true;
+            prosodyAnomalyScore = Math.max(prosodyAnomalyScore, 0.74);
+            anomalies.push(`Phoneme boundary phase discontinuity spikes (${jitter}% jitter)`);
+          }
         }
 
         let riskScore = 4.0;
         if (isAi) {
-          riskScore = Math.min(97.0, Math.max(76.0, vocoderArtifactScore * 100.0));
+          const compositeAiScore = Math.max(vocoderArtifactScore, prosodyAnomalyScore);
+          riskScore = Math.min(97.0, Math.max(76.0, compositeAiScore * 100.0));
         } else {
-          riskScore = Math.round(4 + Math.random() * 6);
+          // Dynamic, natural human risk score based on speaker's actual jitter and pitch modulation
+          const naturalVariation = Math.abs(jitter - 1.25) * 2.5 + (f0Std > 0 ? Math.min(4.0, f0Std / 16.0) : 2.0);
+          riskScore = Math.min(14.0, Math.max(4.0, 4.5 + naturalVariation));
           anomalies.push("Natural organic vocal tract formant resonances verified (F1-F3)");
           anomalies.push(`Healthy biological vocal cord tremor detected (${jitter}% jitter)`);
+          if (f0Std >= 12.0) {
+            anomalies.push(`Natural conversational pitch swings (±${f0Std} Hz variation)`);
+          }
         }
 
         const liveResult = {
@@ -301,7 +338,7 @@ export default function App() {
             spectral_centroid_hz: parseFloat(avgCentroid.toFixed(1)),
             phase_jitter_index: 0.82,
             vocoder_artifact_score: parseFloat(vocoderArtifactScore.toFixed(3)),
-            spectral_flatness: parseFloat(avgFlatness.toFixed(3))
+            spectral_flatness: parseFloat(avgSpeechFlatness.toFixed(3))
           },
           spectrogram_grid: generateVisualSpectrogram(isAi),
           anomalies: anomalies

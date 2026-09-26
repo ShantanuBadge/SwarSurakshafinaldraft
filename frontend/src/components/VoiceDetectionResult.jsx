@@ -34,7 +34,7 @@ export default function VoiceDetectionResult({ result, isStreaming }) {
   const isHuman = !isStandby && !isCritical && !isElevated;
 
   const aiScore = result.risk_score_percent;
-  const humanScore = Math.max(0, 100 - aiScore);
+  const humanScore = result.human_likeness_percent !== undefined ? result.human_likeness_percent : Math.max(0, 100 - aiScore);
 
   return (
     <div className="human-card" style={{ padding: '28px', marginTop: '24px' }}>

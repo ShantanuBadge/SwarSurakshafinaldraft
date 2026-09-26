@@ -54,10 +54,23 @@ class CallStreamSession:
             except Exception:
                 pass
 
-        # 2. Safety acoustic heuristic fusion
+        # 2. Comprehensive acoustic heuristic fusion
         vocoder_score = spec_feats["vocoder_artifact_score"]
-        if vocoder_score > 0.50:
-            raw_score = max(raw_score, vocoder_score * 0.90)
+        prosody_score = pros_feats["prosody_anomaly_score"]
+        jitter_pct = pros_feats["jitter_local_percent"]
+        f0_std = pros_feats["f0_std_hz"]
+        hf_ratio = spec_feats["hf_energy_ratio"]
+
+        if vocoder_score > 0.35:
+            raw_score = max(raw_score, min(0.96, vocoder_score * 1.15))
+        if hf_ratio > 0.015:
+            raw_score = max(raw_score, min(0.98, hf_ratio * 12.0))
+        if prosody_score > 0.35:
+            raw_score = max(raw_score, min(0.95, 0.55 + prosody_score * 0.45))
+        if jitter_pct < 0.55 and f0_std < 10.0:
+            raw_score = max(raw_score, 0.88)
+        elif jitter_pct < 0.60:
+            raw_score = max(raw_score, 0.78)
 
         # Exponential Moving Average smoothing
         alpha = 0.40
@@ -157,12 +170,31 @@ class SwarSurakshaDetector:
             except Exception as e:
                 print("ONNX inference fallback:", e)
 
-        # 2. Forensic boundary fusion
-        if vocoder_score > 0.50:
-            final_probability = max(final_probability, vocoder_score * 0.92)
-        if flatness > 0.15:
-            # Neural synthesis produces elevated spectral flatness
-            final_probability = max(final_probability, 0.85)
+        # 2. Comprehensive forensic boundary fusion
+        # A. High-Frequency Vocoder Leakage & Phase Artifacts
+        if vocoder_score > 0.35:
+            final_probability = max(final_probability, min(0.96, vocoder_score * 1.15))
+        if hf_ratio > 0.015:
+            final_probability = max(final_probability, min(0.98, hf_ratio * 12.0))
+        if flatness > 0.08:
+            final_probability = max(final_probability, min(0.95, 0.50 + flatness * 1.5))
+
+        # B. Robotic / Monotonic Pitch & TTS Invariance
+        if prosody_score > 0.35:
+            final_probability = max(final_probability, min(0.95, 0.55 + prosody_score * 0.45))
+        if jitter_pct < 0.55 and f0_std < 10.0:
+            final_probability = max(final_probability, 0.88)
+        elif jitter_pct < 0.60:
+            final_probability = max(final_probability, 0.78)
+        elif f0_std < 8.0 and mean_f0 > 50.0:
+            final_probability = max(final_probability, 0.82)
+        elif jitter_pct > 3.6:
+            final_probability = max(final_probability, 0.74)
+
+        # C. Verified Natural Human Speech
+        if vocoder_score < 0.15 and prosody_score < 0.15 and hf_ratio < 0.005 and f0_std >= 15.0 and 0.8 <= jitter_pct <= 2.8:
+            natural_risk = 0.05 + min(0.06, abs(jitter_pct - 1.3) * 0.03)
+            final_probability = min(final_probability, natural_risk)
 
         final_probability = float(np.clip(final_probability, 0.04, 0.98))
         risk_percent = round(final_probability * 100.0, 1)
