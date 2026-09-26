@@ -120,6 +120,13 @@ python -m uvicorn backend.main:app --host 127.0.0.1 --port 8008
 
 Open **[http://127.0.0.1:8008](http://127.0.0.1:8008)** in your browser.
 
+### 3. Deploy to Vercel (1-Click Cloud Hosting)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FShantanuBadge%2FSwarSurakshafinaldraft)
+
+1. Import this repository in your [Vercel Dashboard](https://vercel.com/new).
+2. Leave all default settings as-is: the included [`vercel.json`](vercel.json) and root `package.json` automatically orchestrate the build and route API handlers.
+3. Click **Deploy**. Your live web app will be accessible worldwide on `https://<your-project>.vercel.app`.
+
 ---
 
 ## 🧪 Run Automated Verification Tests

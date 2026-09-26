@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "buildCommand": "cd frontend && npm install && npm run build",
+  "outputDirectory": "frontend/dist",
+  "framework": "vite",
+  "rewrites": [
+    { "source": "/api/samples", "destination": "/api/samples.js" },
+    { "source": "/api/health", "destination": "/api/health.js" },
+    { "source": "/api/status", "destination": "/api/status.js" },
+    { "source": "/api/analyze/file", "destination": "/api/analyze.js" },
+    { "source": "/(.*)", "destination": "/$1" }
+  ]
+}
