@@ -2,7 +2,31 @@ import React from 'react';
 import { UserCheck, Bot, Sparkles, Activity, Mic, ShieldAlert, CheckCircle2, AlertTriangle, Layers, Clock } from 'lucide-react';
 
 export default function VoiceDetectionResult({ result, isStreaming }) {
-  if (!result) return null;
+  if (!result) {
+    return (
+      <div className="human-card" style={{ padding: '36px 24px', marginTop: '24px', textAlign: 'center' }}>
+        <div style={{
+          width: '54px',
+          height: '54px',
+          borderRadius: '16px',
+          background: 'rgba(99, 102, 241, 0.12)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          margin: '0 auto 16px auto',
+          border: '1px solid rgba(99, 102, 241, 0.25)'
+        }}>
+          <Activity size={26} color="#818cf8" />
+        </div>
+        <h3 style={{ fontSize: '1.2rem', fontWeight: '700', color: '#f8fafc' }}>
+          Awaiting Audio Input
+        </h3>
+        <p style={{ fontSize: '0.9rem', color: '#94a3b8', marginTop: '6px', maxWidth: '480px', margin: '6px auto 0 auto', lineHeight: '1.5' }}>
+          Click <strong>Start Listening</strong> to analyze your voice in real time, or <strong>Upload an audio file</strong> (.wav, .mp3, .m4a) to inspect vocal fold micro-tremor and neural vocoder artifacts.
+        </p>
+      </div>
+    );
+  }
 
   const isCritical = result.threat_level === 'CRITICAL' || result.risk_score_percent >= 60;
   const isElevated = result.threat_level === 'ELEVATED' || (result.risk_score_percent >= 35 && result.risk_score_percent < 60);

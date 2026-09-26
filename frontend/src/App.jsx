@@ -2,10 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Mic, MicOff, Upload, Volume2, Play, Pause, Sparkles, Activity, ShieldCheck, UserCheck, Bot, CheckCircle2, RotateCcw, AlertTriangle } from 'lucide-react';
 import AudioVisualizer from './components/AudioVisualizer';
 import VoiceDetectionResult from './components/VoiceDetectionResult';
-import { BENCHMARK_SAMPLES, analyzeAudioClientSide } from './utils/audioAnalyzer';
+import { analyzeAudioClientSide } from './utils/audioAnalyzer';
 
 export default function App() {
-  // Input mode: 'mic', 'upload', 'demo'
+  // Input mode: 'mic' | 'upload'
   const [activeMode, setActiveMode] = useState('mic');
   
   // Audio state
@@ -13,35 +13,11 @@ export default function App() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [detectionResult, setDetectionResult] = useState(null);
   const [uploadedFile, setUploadedFile] = useState(null);
-  const [samples, setSamples] = useState(BENCHMARK_SAMPLES);
-  const [selectedSampleId, setSelectedSampleId] = useState('ai_cloned_voice');
-  const [isPlayingDemo, setIsPlayingDemo] = useState(false);
 
   // Audio refs
   const audioContextRef = useRef(null);
   const micStreamRef = useRef(null);
-  const audioPlayerRef = useRef(null);
   const timerRef = useRef(null);
-
-  // Fetch samples on load
-  useEffect(() => {
-    fetch('/api/samples')
-      .then(res => {
-        if (!res.ok) throw new Error('API offline');
-        return res.json();
-      })
-      .then(data => {
-        if (data && data.length > 0) {
-          setSamples(data);
-        }
-      })
-      .catch(() => {
-        // Keeps default BENCHMARK_SAMPLES silently
-      });
-
-    // Run initial demo preview
-    runDemoAnalysis('ai_cloned_voice');
-  }, []);
 
   // 1. Microphone Mode Handlers
   const startListening = async () => {
@@ -137,77 +113,7 @@ export default function App() {
     }
   };
 
-  // 3. Demo Voice Analysis Handler
-  const runDemoAnalysis = async (sampleId) => {
-    setSelectedSampleId(sampleId);
-    setIsAnalyzing(true);
 
-    const foundSample = samples.find(s => s.id === sampleId) || BENCHMARK_SAMPLES.find(s => s.id === sampleId);
-    const audioUrl = foundSample?.audio_url || `/samples/${sampleId}.wav`;
-
-    if (audioPlayerRef.current) {
-      audioPlayerRef.current.src = audioUrl;
-      audioPlayerRef.current.play().then(() => setIsPlayingDemo(true)).catch(() => {});
-    }
-
-    try {
-      const res = await fetch(`/api/samples/${sampleId}/audio`).catch(() => fetch(audioUrl));
-      if (!res.ok) throw new Error("Audio fetch failed");
-      const blob = await res.blob();
-      const formData = new FormData();
-      formData.append('file', blob, `${sampleId}.wav`);
-      formData.append('speaker_name', foundSample?.speaker || sampleId.replace(/_/g, ' '));
-
-      const response = await fetch('/api/analyze/file', {
-        method: 'POST',
-        body: formData
-      });
-      if (!response.ok) throw new Error("API analysis failed");
-      const data = await response.json();
-      setDetectionResult(data);
-    } catch (err) {
-      console.warn('Using client-side benchmark analysis:', err);
-      if (foundSample) {
-        const isAi = foundSample.expected_verdict?.includes('AI') || (foundSample.risk_score >= 50);
-        setDetectionResult({
-          session_id: `DEMO-${Date.now()}`,
-          speaker_name: foundSample.speaker,
-          verdict: foundSample.expected_verdict,
-          verdict_label: isAi ? "Deepfake AI Voice Clone Detected" : "Verified Natural Human Voice",
-          threat_level: foundSample.expected_threat,
-          risk_score_percent: foundSample.risk_score || (isAi ? 88.0 : 4.0),
-          human_likeness_percent: foundSample.human_likeness || (isAi ? 12.0 : 96.0),
-          duration_seconds: 4.2,
-          inference_latency_ms: 12.8,
-          biomarkers: {
-            f0_mean_hz: 145.0,
-            f0_std_hz: 22.0,
-            jitter_percent: foundSample.jitter || (isAi ? 0.38 : 1.56),
-            shimmer_percent: 12.0,
-            hnr_db: 20.0,
-            hf_energy_ratio: isAi ? 0.08 : 0.002,
-            spectral_centroid_hz: 1400.0,
-            phase_jitter_index: 0.85,
-            vocoder_artifact_score: foundSample.vocoder_artifact || (isAi ? 0.65 : 0.02),
-            spectral_flatness: isAi ? 0.18 : 0.02
-          },
-          anomalies: isAi 
-            ? ["Neural vocoder high-frequency overtone leaks detected (>6.5 kHz)", "Elevated spectral flatness typical of synthetic speech", "Robotic pitch micro-invariance"]
-            : ["Natural organic vocal tract formant resonances verified", "Healthy physiological vocal fold micro-tremor detected"],
-          spectrogram_grid: generateVisualSpectrogram(isAi),
-          audit_block: {
-            session_id: `DEMO-${Date.now()}`,
-            timestamp: Date.now() / 1000,
-            risk_score: foundSample.risk_score || 85.0,
-            verdict: foundSample.expected_verdict,
-            block_hash: `0000${Math.random().toString(16).slice(2, 18)}`
-          }
-        });
-      }
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
 
   // Helper to generate visual spectrogram data
   function generateVisualSpectrogram(isAi) {
@@ -233,12 +139,7 @@ export default function App() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       
-      {/* Hidden Audio Player */}
-      <audio
-        ref={audioPlayerRef}
-        onEnded={() => setIsPlayingDemo(false)}
-        style={{ display: 'none' }}
-      />
+
 
       {/* Top Header */}
       <header style={{
@@ -312,9 +213,8 @@ export default function App() {
             boxShadow: '0 8px 24px rgba(0, 0, 0, 0.3)'
           }}>
             {[
-              { id: 'mic', label: '🎙️ Live Microphone', desc: 'Speak & test your voice' },
-              { id: 'upload', label: '📁 Upload Audio', desc: 'Analyze any audio file' },
-              { id: 'demo', label: '🎧 Try Demo Clips', desc: 'Real Human vs AI Clone' }
+              { id: 'mic', label: '🎙️ Live Microphone', desc: 'Speak & test your voice in real time' },
+              { id: 'upload', label: '📁 Upload Audio', desc: 'Analyze any audio file (.wav, .mp3, .m4a)' }
             ].map(tab => {
               const active = activeMode === tab.id;
               return (
@@ -328,10 +228,10 @@ export default function App() {
                     background: active ? 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)' : 'transparent',
                     color: active ? '#ffffff' : '#94a3b8',
                     border: 'none',
-                    padding: '10px 22px',
+                    padding: '10px 24px',
                     borderRadius: '12px',
                     fontWeight: active ? '700' : '500',
-                    fontSize: '0.9rem',
+                    fontSize: '0.95rem',
                     cursor: 'pointer',
                     transition: 'all 0.2s ease',
                     boxShadow: active ? '0 4px 14px rgba(99, 102, 241, 0.4)' : 'none'
@@ -353,12 +253,12 @@ export default function App() {
               <span style={{ fontSize: '0.8rem', fontWeight: '600', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Live Acoustic Waveform
               </span>
-              <span style={{ fontSize: '0.75rem', color: isListening ? '#10b981' : isPlayingDemo ? '#38bdf8' : '#64748b' }}>
-                {isListening ? '● Listening Live (16,000 Hz)' : isPlayingDemo ? '● Playing Audio' : 'Standby'}
+              <span style={{ fontSize: '0.75rem', color: isListening ? '#10b981' : isAnalyzing ? '#38bdf8' : '#64748b' }}>
+                {isListening ? '● Listening Live (16,000 Hz)' : isAnalyzing ? '● Analyzing Audio Spectrum...' : 'Standby'}
               </span>
             </div>
             <AudioVisualizer
-              isActive={isListening || isPlayingDemo || isAnalyzing}
+              isActive={isListening || isAnalyzing}
               isAiVoice={isAiDetected}
             />
           </div>
@@ -453,50 +353,7 @@ export default function App() {
             </div>
           )}
 
-          {/* Mode 3: Demo Voice Clips */}
-          {activeMode === 'demo' && (
-            <div>
-              <span style={{ fontSize: '0.85rem', color: '#94a3b8', display: 'block', marginBottom: '12px' }}>
-                Select a benchmark voice clip to test the detection model:
-              </span>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
-                {samples.map(sample => {
-                  const isSelected = selectedSampleId === sample.id;
-                  const isAiSample = sample.id.includes('cloned') || sample.id.includes('bot');
-                  return (
-                    <div
-                      key={sample.id}
-                      onClick={() => runDemoAnalysis(sample.id)}
-                      style={{
-                        padding: '16px',
-                        borderRadius: '14px',
-                        background: isSelected ? 'rgba(99, 102, 241, 0.18)' : 'rgba(10, 14, 26, 0.5)',
-                        border: isSelected ? '1.5px solid #6366f1' : '1px solid var(--border-subtle)',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease'
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                        <span style={{ fontSize: '0.95rem', fontWeight: '700', color: isSelected ? '#a5b4fc' : '#f8fafc' }}>
-                          {sample.title}
-                        </span>
-                        <span className={`pill-badge ${isAiSample ? 'pill-ai' : 'pill-human'}`} style={{ fontSize: '0.65rem' }}>
-                          {isAiSample ? 'AI Generated' : 'Human Voice'}
-                        </span>
-                      </div>
-                      <p style={{ fontSize: '0.78rem', color: '#94a3b8', lineHeight: '1.4' }}>
-                        {sample.description}
-                      </p>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '10px', fontSize: '0.75rem', color: '#38bdf8' }}>
-                        <Play size={12} fill="#38bdf8" />
-                        <span>Click to listen &amp; analyze</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+
 
         </div>
 
