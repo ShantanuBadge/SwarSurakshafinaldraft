@@ -16,7 +16,6 @@ export default function handler(req, res) {
       "Vocal Fold Jitter & Prosody Biomarker Tracker",
       "Spectro-Temporal Graph Anomaly Classifier"
     ],
-    deployment: "Vercel Edge / Serverless Cloud",
-    latency_ms: 12.8
+    deployment: "Vercel Edge / Serverless Cloud"
   });
 }

@@ -60,8 +60,6 @@ export default function Header({ activeTab, setActiveTab, systemStatus }) {
             <span style={{ color: '#f8fafc', fontWeight: '600' }}>Engine: Active</span>
             <span style={{ color: '#64748b' }}>|</span>
             <span style={{ color: '#38bdf8' }}>ONNX Runtime 1.30</span>
-            <span style={{ color: '#64748b' }}>|</span>
-            <span style={{ color: '#94a3b8' }}>~14ms Latency</span>
           </div>
 
           <div style={{

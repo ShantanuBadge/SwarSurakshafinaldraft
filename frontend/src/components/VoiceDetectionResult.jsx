@@ -100,10 +100,10 @@ export default function VoiceDetectionResult({ result, isStreaming }) {
           </div>
         </div>
 
-        {/* Speed / Latency Badge */}
+        {/* Edge Processing Badge */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#94a3b8', fontSize: '0.8rem', background: 'rgba(0, 0, 0, 0.25)', padding: '6px 14px', borderRadius: '20px' }}>
-          <Clock size={14} color="#38bdf8" />
-          <span>Analysis Speed: {result.inference_latency_ms || '14.2'} ms (Edge On-Device)</span>
+          <Activity size={14} color="#38bdf8" />
+          <span>Edge Neural Inference</span>
         </div>
 
       </div>

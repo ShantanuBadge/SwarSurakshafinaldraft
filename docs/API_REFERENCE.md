@@ -59,15 +59,14 @@ Returns benchmark voice clips for instant zero-upload demonstration.
 ---
 
 ### `GET /api/health`
-System status and edge model latency probe.
+System status and edge model engine probe.
 
 **Response:**
 ```json
 {
   "status": "active",
   "system": "SwarSuraksha Voice Clone Shield v3.0",
-  "framework": "ONNX Runtime 1.30",
-  "latency_ms": 14.2
+  "framework": "ONNX Runtime 1.30"
 }
 ```
 

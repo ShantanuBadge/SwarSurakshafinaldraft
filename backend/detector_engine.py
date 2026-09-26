@@ -111,8 +111,7 @@ class SwarSurakshaDetector:
             "framework": "ONNX Runtime 1.30 (Standard ONNX v14 / IR 9)",
             "model_path": MODEL_OUTPUT_PATH,
             "inference_mode": "Edge On-Device (Zero-Cloud Audio Leakage)",
-            "languages": ["Natural Human Speech", "Multi-accent Speech", "Neural Synthetics"],
-            "latency_ms": 12.8
+            "languages": ["Natural Human Speech", "Multi-accent Speech", "Neural Synthetics"]
         }
 
     def load_onnx_model(self):

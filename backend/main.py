@@ -52,8 +52,7 @@ def get_system_status():
             "Neural Vocoder Phase Detector (>6.5 kHz)",
             "Vocal Fold Jitter & Prosody Biomarker Tracker",
             "Spectro-Temporal Graph Anomaly Classifier"
-        ],
-        "latency_ms": 14.2
+        ]
     }
 
 

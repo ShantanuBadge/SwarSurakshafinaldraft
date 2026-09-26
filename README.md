@@ -29,8 +29,8 @@ With modern generative voice synthesis and neural vocoders (ElevenLabs, XTTS, Fa
 2. **Universal Audio Demuxer**
    - Seamlessly ingests and decodes **`.wav`**, **`.mp3`**, **`.m4a`** (Apple/AAC voice memos), **`.webm`**, **`.flac`**, and **`.ogg`** without transcoding loss or high-frequency distortion.
 
-3. **Ultra-Low Latency Edge Inference**
-   - Packaged as an optimized **ONNX Runtime** binary (< 5 KB footprint) running locally on edge CPUs with **< 15ms latency**—zero cloud audio leakage.
+3. **Edge Neural Inference**
+   - Packaged as an optimized **ONNX Runtime** binary (< 5 KB footprint) running locally on edge CPUs—zero cloud audio leakage.
 
 4. **Live Microphone & Telephony WebSocket Ingestion**
    - Real-time rolling audio evaluation with Exponential Moving Average (EMA) scoring.

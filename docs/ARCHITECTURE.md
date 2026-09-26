@@ -61,7 +61,7 @@ $$\text{Spectral Flatness} = \frac{\exp\left(\frac{1}{N} \sum_{k=0}^{N-1} \ln S(
 - **WebSocket Ingestion**: Binary PCM chunks are streamed over `/ws/live-call` at 16 kHz.
 - **Rolling Window**: Audio is evaluated over an active buffer with Exponential Moving Average (EMA) smoothing:
   $$\text{Risk}_t = \alpha \cdot \text{RawScore}_t + (1 - \alpha) \cdot \text{Risk}_{t-1}, \quad \alpha = 0.40$$
-- **Edge Latency**: End-to-end evaluation time is **< 15 milliseconds**, allowing seamless live phone call and microphone monitoring without perceivable lag.
+- **Edge Evaluation**: Real-time on-device evaluation allows seamless live phone call and microphone monitoring without perceivable lag.
 
 ---
 

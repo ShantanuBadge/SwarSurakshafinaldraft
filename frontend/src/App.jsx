@@ -184,8 +184,6 @@ export default function App() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255, 255, 255, 0.05)', padding: '6px 14px', borderRadius: '20px', border: '1px solid var(--border-subtle)', fontSize: '0.8rem' }}>
             <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981', boxShadow: '0 0 8px #10b981' }}></span>
             <span style={{ color: '#cbd5e1', fontWeight: '500' }}>AASIST Neural Model Ready</span>
-            <span style={{ color: '#64748b' }}>•</span>
-            <span style={{ color: '#38bdf8' }}>~14ms Latency</span>
           </div>
         </div>
       </header>

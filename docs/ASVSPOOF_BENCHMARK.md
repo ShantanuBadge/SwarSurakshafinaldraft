@@ -42,7 +42,6 @@ The repository includes a ready-to-run training script: [`backend/train_kaggle_a
 | Evaluation Metric | Target / Baseline | SwarSuraksha Performance |
 | :--- | :--- | :--- |
 | **Equal Error Rate (EER)** | $< 3.5\%$ | **$1.8\%$** |
-| **Inference Latency** | $< 50\text{ ms}$ | **$12.8\text{ ms}$ (Edge CPU)** |
 | **Real Human Recall** | $> 95\%$ | **$96.0\%$** |
 | **AI Clone Precision** | $> 95\%$ | **$98.2\%$** |
 | **Model Footprint** | $< 50\text{ MB}$ | **$5\text{ KB}$ (ONNX Graph)** |
